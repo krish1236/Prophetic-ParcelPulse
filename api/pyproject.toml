@@ -14,7 +14,11 @@ dependencies = [
     "psycopg2-binary>=2.9",
     "httpx>=0.28",
     "tenacity>=9.0",
+    "apscheduler>=3.10",
 ]
+
+[project.scripts]
+parcelpulse-scheduler = "parcelpulse.workers.scheduler:main"
 
 [project.optional-dependencies]
 dev = [
