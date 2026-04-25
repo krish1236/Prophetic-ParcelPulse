@@ -46,6 +46,7 @@ select = ["E", "F", "I", "B", "UP", "N"]
 "alembic/versions/*.py" = ["E501"]
 # FastAPI idiomatically uses Depends() in argument defaults.
 "src/parcelpulse/routes/*.py" = ["B008"]
+"src/parcelpulse/main.py" = ["B008"]
 # Tests have inline WKT/SQL literals that don't fit 100 cols cleanly.
 "tests/*.py" = ["E501"]
 

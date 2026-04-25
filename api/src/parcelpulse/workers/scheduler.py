@@ -15,14 +15,10 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from parcelpulse.adapters.base import SourceAdapter
-from parcelpulse.adapters.multco_permits import MultcoPermitsAdapter
 from parcelpulse.ingest import insert_events
+from parcelpulse.registry import all_adapters
 
 log = logging.getLogger(__name__)
-
-
-def all_adapters() -> list[SourceAdapter]:
-    return [MultcoPermitsAdapter()]
 
 
 async def run_adapter_once(adapter: SourceAdapter) -> tuple[int, int]:
