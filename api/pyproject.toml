@@ -12,13 +12,13 @@ dependencies = [
     "geoalchemy2>=0.16",
     "pydantic-settings>=2.6",
     "psycopg2-binary>=2.9",
+    "httpx>=0.28",
 ]
 
 [project.optional-dependencies]
 dev = [
     "ruff>=0.8",
     "pytest>=8.3",
-    "httpx>=0.28",
 ]
 
 [build-system]
