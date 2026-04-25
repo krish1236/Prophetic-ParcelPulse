@@ -1,0 +1,37 @@
+name: parcelpulse
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: parcelpulse
+      POSTGRES_PASSWORD: parcelpulse
+      POSTGRES_DB: parcelpulse
+    # Host port 55432 to avoid collision with any local Postgres or other compose stacks.
+    # Container port stays standard 5432.
+    ports:
+      - "55432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U parcelpulse -d parcelpulse"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    # Host port 56379 to avoid collision with other Redis instances.
+    ports:
+      - "56379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres_data:
+  redis_data:
