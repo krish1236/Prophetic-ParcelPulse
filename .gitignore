@@ -4,6 +4,7 @@ docs/
 # Local AI tooling
 .claude/
 CLAUDE.md
+AGENTS.md
 
 # Environment
 .env
