@@ -8,6 +8,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     LargeBinary,
     Numeric,
@@ -54,6 +55,9 @@ class Event(Base):
         UniqueConstraint(
             "source", "external_id", "payload_hash", name="events_dedup_key"
         ),
+        Index("events_geom_gist", "geometry", postgresql_using="gist"),
+        Index("events_ingested_at_brin", "ingested_at", postgresql_using="brin"),
+        Index("events_source_type", "source", "event_type"),
     )
 
 
@@ -87,6 +91,8 @@ class Parcel(Base):
 
     __table_args__ = (
         UniqueConstraint("county_fips", "apn", name="parcels_county_apn_key"),
+        Index("parcels_geom_gist", "geom", postgresql_using="gist"),
+        Index("parcels_centroid_gist", "centroid", postgresql_using="gist"),
     )
 
 
@@ -163,6 +169,13 @@ class Alert(Base):
         ),
         UniqueConstraint(
             "watchlist_id", "dedupe_key", name="alerts_watchlist_dedupe_key"
+        ),
+        Index("alerts_feed", "watchlist_id", text("created_at DESC")),
+        Index("alerts_axis", "watchlist_id", "axis", text("created_at DESC")),
+        Index(
+            "alerts_materiality",
+            "watchlist_id",
+            text("materiality_score DESC"),
         ),
     )
 
