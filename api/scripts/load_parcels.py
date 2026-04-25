@@ -104,10 +104,18 @@ def feature_to_row(feature: dict[str, Any]) -> dict[str, Any] | None:
 async def upsert_batch(rows: list[dict[str, Any]]) -> None:
     if not rows:
         return
+    # Multnomah taxlot data occasionally repeats the same MAPTAXLOT within a page
+    # (multiple records sharing one APN — usually condo units on a parent lot).
+    # ON CONFLICT DO UPDATE rejects duplicate keys in a single statement, so
+    # dedupe per-batch and keep the last occurrence.
+    deduped: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        deduped[row["apn"]] = row
+    payload = list(deduped.values())
     async with SessionLocal() as session:
         await session.execute(
             UPSERT_SQL,
-            {"county_fips": MULTNOMAH_FIPS, "rows": json.dumps(rows)},
+            {"county_fips": MULTNOMAH_FIPS, "rows": json.dumps(payload)},
         )
         await session.commit()
 
