@@ -10,7 +10,10 @@ export function RecentWatchlists() {
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    // localStorage is client-only; hydration after mount is the SSR-safe pattern.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setItems(getRecentWatchlists());
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setHydrated(true);
   }, []);
 

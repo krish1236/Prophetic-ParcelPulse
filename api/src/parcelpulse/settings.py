@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     # Rate limit on visitor-created watchlists.
     watchlist_create_rate_limit: int = 5
     watchlist_create_rate_window_seconds: int = 3600
+    # /admin/ops gating. Empty in dev = no auth; set in prod to require header.
+    ops_token: str = ""
 
 
 settings = Settings()
