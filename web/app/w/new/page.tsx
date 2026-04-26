@@ -1,16 +1,34 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { addParcels, createWatchlist } from "@/lib/api";
+
+// Polygon draw is heavy (mapbox-gl-draw + maplibre); load it client-side only
+// so the form's initial paint isn't blocked.
+const PolygonDraw = dynamic(
+  () => import("@/components/polygon-draw").then((m) => m.PolygonDraw),
+  { ssr: false, loading: () => <PolygonSkeleton /> },
+);
+
+function PolygonSkeleton() {
+  return (
+    <div className="flex h-[50vh] w-full items-center justify-center rounded-lg border border-dashed border-zinc-800 text-xs text-zinc-600">
+      loading map…
+    </div>
+  );
+}
 
 export default function NewWatchlistPage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [thesis, setThesis] = useState("");
   const [apnsText, setApnsText] = useState("");
+  const [polygon, setPolygon] = useState<GeoJSON.Polygon | null>(null);
+  const [mode, setMode] = useState<"apns" | "polygon">("apns");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resolved, setResolved] = useState<{
@@ -26,18 +44,26 @@ export default function NewWatchlistPage() {
       setError("Deal thesis must be at least 20 characters.");
       return;
     }
-    const apns = apnsText
-      .split(/[\n,]/)
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
+    if (mode === "polygon" && !polygon) {
+      setError("Draw a polygon on the map (or switch to APN list).");
+      return;
+    }
+    const apns =
+      mode === "apns"
+        ? apnsText
+            .split(/[\n,]/)
+            .map((s) => s.trim())
+            .filter((s) => s.length > 0)
+        : [];
     setSubmitting(true);
     try {
       const wl = await createWatchlist({ name: name.trim(), deal_thesis: thesis.trim() });
-      if (apns.length > 0) {
-        const r = await addParcels(wl.watchlist_id, { apns });
+      const req =
+        mode === "polygon" && polygon ? { polygon } : apns.length > 0 ? { apns } : null;
+      if (req) {
+        const r = await addParcels(wl.watchlist_id, req);
         setResolved({ added: r.added, not_found: r.not_found });
         if (r.added === 0) {
-          // Stay on page so user can correct or try polygon flow.
           setSubmitting(false);
           return;
         }
@@ -105,18 +131,63 @@ export default function NewWatchlistPage() {
           </p>
         </Field>
 
-        <Field
-          label="Parcels"
-          help="One Multnomah APN per line (or comma-separated). The polygon-draw flow lands in Phase 9 chunk 3."
-        >
-          <textarea
-            value={apnsText}
-            onChange={(e) => setApnsText(e.target.value)}
-            rows={5}
-            placeholder={`1S1E03CD  -00800\n1N1E35AB  -07101\n1N1E23DB  -15600`}
-            className="w-full rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 font-mono text-xs leading-relaxed text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-600 focus:outline-none"
-          />
-        </Field>
+        <div>
+          <span className="font-mono text-xs uppercase tracking-wider text-zinc-500">
+            Parcels <span className="ml-1 text-rose-400">*</span>
+          </span>
+          <div className="mt-1.5 mb-3 inline-flex rounded-md border border-zinc-800 p-0.5 font-mono text-[11px] uppercase tracking-wider">
+            <button
+              type="button"
+              onClick={() => setMode("apns")}
+              className={`rounded px-3 py-1 transition ${
+                mode === "apns" ? "bg-zinc-800 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              by APN
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("polygon")}
+              className={`rounded px-3 py-1 transition ${
+                mode === "polygon" ? "bg-zinc-800 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              draw on map
+            </button>
+          </div>
+          {mode === "apns" ? (
+            <>
+              <textarea
+                value={apnsText}
+                onChange={(e) => setApnsText(e.target.value)}
+                rows={5}
+                placeholder={`1S1E03CD  -00800\n1N1E35AB  -07101\n1N1E23DB  -15600`}
+                className="w-full rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 font-mono text-xs leading-relaxed text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-600 focus:outline-none"
+              />
+              <p className="mt-1 font-mono text-[11px] text-zinc-600">
+                One Multnomah APN per line (or comma-separated).
+              </p>
+            </>
+          ) : (
+            <>
+              <PolygonDraw
+                onChange={setPolygon}
+                className="h-[50vh] w-full overflow-hidden rounded-lg border border-zinc-800"
+              />
+              <p className="mt-1 flex items-center justify-between font-mono text-[11px] text-zinc-600">
+                <span>
+                  Use the polygon tool (top-left) to outline an area. Capped at
+                  200 resolved parcels server-side.
+                </span>
+                <span
+                  className={polygon ? "text-emerald-400" : "text-zinc-600"}
+                >
+                  {polygon ? "polygon ready" : "no polygon yet"}
+                </span>
+              </p>
+            </>
+          )}
+        </div>
 
         {error && (
           <p className="rounded-md border border-rose-900/40 bg-rose-950/30 px-3 py-2 font-mono text-xs text-rose-300">
