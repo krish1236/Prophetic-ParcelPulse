@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { ParcelMap } from "@/components/parcel-map";
 import { type AlertSummary, fetchWatchlistFeed } from "@/lib/api";
 import { AXIS_STYLES, formatRelativeTime, scoreTone } from "@/lib/ui";
 
@@ -12,8 +13,8 @@ export default async function WatchlistPage({
   const feed = await fetchWatchlistFeed(id, { limit: 50 });
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-6 py-12">
-      <header className="mb-10 space-y-2">
+    <main className="mx-auto w-full max-w-7xl px-6 py-10">
+      <header className="mb-8 space-y-2">
         <p className="font-mono text-xs uppercase tracking-[0.2em] text-zinc-500">
           Watchlist · {id.slice(0, 8)}
         </p>
@@ -26,18 +27,62 @@ export default async function WatchlistPage({
         </p>
       </header>
 
-      {feed.items.length === 0 ? (
-        <EmptyState />
-      ) : (
-        <ol className="space-y-3">
-          {feed.items.map((alert) => (
-            <li key={alert.alert_id}>
-              <AlertRow watchlistId={id} alert={alert} />
-            </li>
-          ))}
-        </ol>
-      )}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+        <section className="lg:col-span-2">
+          {feed.items.length === 0 ? (
+            <EmptyState />
+          ) : (
+            <ol className="space-y-3">
+              {feed.items.map((alert) => (
+                <li key={alert.alert_id}>
+                  <AlertRow watchlistId={id} alert={alert} />
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
+
+        <section className="lg:col-span-3">
+          <div className="lg:sticky lg:top-6">
+            <ParcelMap
+              watchlistId={id}
+              className="h-[55vh] w-full overflow-hidden rounded-lg border border-zinc-800 lg:h-[calc(100vh-7rem)]"
+            />
+            <MapLegend />
+          </div>
+        </section>
+      </div>
     </main>
+  );
+}
+
+function MapLegend() {
+  const axes: Array<{ axis: keyof typeof AXIS_STYLES; color: string }> = [
+    { axis: "permit", color: "#f59e0b" },
+    { axis: "flood", color: "#0ea5e9" },
+    { axis: "zoning", color: "#a855f7" },
+    { axis: "ownership", color: "#10b981" },
+    { axis: "market", color: "#f43f5e" },
+  ];
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 px-1 font-mono text-[10px] uppercase tracking-wider text-zinc-500">
+      <span>parcels</span>
+      <span className="inline-flex items-center gap-1.5">
+        <span className="block h-2 w-3 rounded-sm border border-blue-500 bg-blue-500/20" />
+        watched
+      </span>
+      <span className="ml-2 text-zinc-700">·</span>
+      <span>alerts</span>
+      {axes.map((a) => (
+        <span key={a.axis} className="inline-flex items-center gap-1.5">
+          <span
+            className="block h-2 w-2 rounded-full"
+            style={{ backgroundColor: a.color }}
+          />
+          {a.axis}
+        </span>
+      ))}
+    </div>
   );
 }
 
