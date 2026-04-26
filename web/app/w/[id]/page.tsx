@@ -14,17 +14,25 @@ export default async function WatchlistPage({
 
   return (
     <main className="mx-auto w-full max-w-7xl px-6 py-10">
-      <header className="mb-8 space-y-2">
-        <p className="font-mono text-xs uppercase tracking-[0.2em] text-zinc-500">
-          Watchlist · {id.slice(0, 8)}
-        </p>
-        <h1 className="text-3xl font-semibold tracking-tight">
-          {feed.total} {feed.total === 1 ? "alert" : "alerts"}
-        </h1>
-        <p className="text-sm text-zinc-500">
-          Live materiality screen against the demo watchlist&apos;s deal thesis. Click any
-          alert to see the decision trace.
-        </p>
+      <header className="mb-8 flex items-start justify-between gap-6">
+        <div className="space-y-2">
+          <p className="font-mono text-xs uppercase tracking-[0.2em] text-zinc-500">
+            Watchlist · {id.slice(0, 8)}
+          </p>
+          <h1 className="text-3xl font-semibold tracking-tight">
+            {feed.total} {feed.total === 1 ? "alert" : "alerts"}
+          </h1>
+          <p className="text-sm text-zinc-500">
+            Live materiality screen against the demo watchlist&apos;s deal thesis. Click any
+            alert to see the decision trace.
+          </p>
+        </div>
+        <Link
+          href={`/w/${id}/replay`}
+          className="shrink-0 rounded-md border border-zinc-800 px-3 py-1.5 font-mono text-xs uppercase tracking-wider text-zinc-400 transition hover:border-zinc-700 hover:text-zinc-200"
+        >
+          replay →
+        </Link>
       </header>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">

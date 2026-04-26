@@ -105,3 +105,42 @@ export async function fetchAlert(alertId: string): Promise<AlertDetail> {
   }
   return (await res.json()) as AlertDetail;
 }
+
+export type ReplayAlert = {
+  event_id: string;
+  parcel_id: string;
+  parcel_apn: string;
+  axis: Axis;
+  materiality_score: number;
+  confidence: number;
+  summary: string;
+  classifier_tier: ClassifierTier;
+  occurred_at: string;
+};
+
+export type ReplayResponse = {
+  run_id: string;
+  from_ts: string;
+  to_ts: string;
+  alerts: ReplayAlert[];
+  candidate_total: number;
+  skipped_for_cache_miss: number;
+  cache_hit_pct: number;
+  duration_ms: number;
+  ran_at: string;
+};
+
+export async function postReplay(req: {
+  watchlist_id: string;
+  from_ts: string;
+  to_ts: string;
+}): Promise<ReplayResponse> {
+  const res = await fetch(`${API_BASE_URL}/replay`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`replay failed: ${res.status}`);
+  return (await res.json()) as ReplayResponse;
+}
