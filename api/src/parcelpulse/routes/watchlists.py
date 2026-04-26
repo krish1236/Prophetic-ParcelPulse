@@ -1,15 +1,28 @@
+import json
 from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from parcelpulse.db import get_session
-from parcelpulse.schemas.alerts import AlertFeedResponse, AlertSummary
+from parcelpulse.schemas.alerts import (
+    AlertFeedResponse,
+    AlertSummary,
+    WatchedParcelsAddRequest,
+    WatchedParcelsAddResponse,
+    WatchlistCreateRequest,
+    WatchlistDetail,
+)
 
 router = APIRouter(prefix="/watchlists", tags=["watchlists"])
+
+# UUID space for watchlists created by anonymous (visitor) flows. Real
+# multi-tenant workspaces are out of scope for the demo (vision §12).
+ANONYMOUS_WORKSPACE_ID = UUID("00000000-0000-0000-0000-0000ffff0000")
+MAX_PARCELS_PER_RESOLVE = 200
 
 
 @router.get("/{watchlist_id}/feed", response_model=AlertFeedResponse)
@@ -69,4 +82,138 @@ async def get_feed(
         total=total,
         limit=limit,
         offset=offset,
+    )
+
+
+@router.post("", response_model=WatchlistDetail)
+async def create_watchlist(
+    req: WatchlistCreateRequest,
+    session: AsyncSession = Depends(get_session),
+) -> WatchlistDetail:
+    row = (
+        await session.execute(
+            text("""
+                INSERT INTO watchlists (workspace_id, name, deal_thesis, thesis_version)
+                VALUES (:ws, :name, :thesis, 1)
+                RETURNING watchlist_id, name, deal_thesis, created_at
+            """),
+            {
+                "ws": str(ANONYMOUS_WORKSPACE_ID),
+                "name": req.name,
+                "thesis": req.deal_thesis,
+            },
+        )
+    ).mappings().one()
+    await session.commit()
+    return WatchlistDetail(
+        watchlist_id=row["watchlist_id"],
+        name=row["name"],
+        deal_thesis=row["deal_thesis"],
+        parcel_count=0,
+        alert_count=0,
+        created_at=row["created_at"],
+    )
+
+
+@router.get("/{watchlist_id}", response_model=WatchlistDetail)
+async def get_watchlist(
+    watchlist_id: UUID,
+    session: AsyncSession = Depends(get_session),
+) -> WatchlistDetail:
+    row = (
+        await session.execute(
+            text("""
+                SELECT
+                    w.watchlist_id, w.name, w.deal_thesis, w.created_at,
+                    (SELECT count(*) FROM watched_parcels WHERE watchlist_id = w.watchlist_id)
+                        AS parcel_count,
+                    (SELECT count(*) FROM alerts WHERE watchlist_id = w.watchlist_id)
+                        AS alert_count
+                FROM watchlists w
+                WHERE w.watchlist_id = :id
+            """),
+            {"id": str(watchlist_id)},
+        )
+    ).mappings().first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="watchlist not found")
+    return WatchlistDetail(**dict(row))
+
+
+@router.post("/{watchlist_id}/parcels", response_model=WatchedParcelsAddResponse)
+async def add_parcels(
+    watchlist_id: UUID,
+    req: WatchedParcelsAddRequest,
+    session: AsyncSession = Depends(get_session),
+) -> WatchedParcelsAddResponse:
+    if not req.apns and not req.polygon:
+        raise HTTPException(
+            status_code=400, detail="must provide either apns or polygon"
+        )
+    # Confirm the watchlist exists; ON CONFLICT silently no-ops on a missing FK
+    # otherwise.
+    exists = (
+        await session.execute(
+            text("SELECT 1 FROM watchlists WHERE watchlist_id = :id"),
+            {"id": str(watchlist_id)},
+        )
+    ).scalar_one_or_none()
+    if exists is None:
+        raise HTTPException(status_code=404, detail="watchlist not found")
+
+    not_found = 0
+    if req.apns:
+        # Find APNs that match a parcel before insert so we can report misses.
+        matched = (
+            await session.execute(
+                text(
+                    "SELECT parcel_id, apn FROM parcels "
+                    "WHERE apn = ANY(:apns) AND county_fips = '41051'"
+                ),
+                {"apns": req.apns},
+            )
+        ).mappings().all()
+        not_found = len(req.apns) - len(matched)
+        added_rows = await session.execute(
+            text("""
+                INSERT INTO watched_parcels (watchlist_id, parcel_id)
+                SELECT :w, parcel_id FROM parcels
+                WHERE apn = ANY(:apns) AND county_fips = '41051'
+                ON CONFLICT (watchlist_id, parcel_id) DO NOTHING
+                RETURNING parcel_id
+            """),
+            {"w": str(watchlist_id), "apns": req.apns},
+        )
+        added = len(added_rows.fetchall())
+    else:
+        added_rows = await session.execute(
+            text(f"""
+                INSERT INTO watched_parcels (watchlist_id, parcel_id)
+                SELECT :w, p.parcel_id
+                FROM parcels p
+                WHERE p.county_fips = '41051'
+                  AND ST_Intersects(
+                      p.geom,
+                      ST_SetSRID(ST_GeomFromGeoJSON(:poly), 4326)
+                  )
+                ORDER BY p.parcel_id
+                LIMIT {MAX_PARCELS_PER_RESOLVE}
+                ON CONFLICT (watchlist_id, parcel_id) DO NOTHING
+                RETURNING parcel_id
+            """),
+            {"w": str(watchlist_id), "poly": json.dumps(req.polygon)},
+        )
+        added = len(added_rows.fetchall())
+
+    total = (
+        await session.execute(
+            text(
+                "SELECT count(*) FROM watched_parcels WHERE watchlist_id = :w"
+            ),
+            {"w": str(watchlist_id)},
+        )
+    ).scalar_one()
+    await session.commit()
+    return WatchedParcelsAddResponse(
+        added=added, not_found=not_found, total_watched=total
     )
