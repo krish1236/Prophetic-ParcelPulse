@@ -112,14 +112,48 @@ def _fake_client(input_payload: dict) -> SimpleNamespace:
     )
 
 
+# Score 50 is below TIER2_MATERIALITY_THRESHOLD (60) so Tier 2 won't fire and
+# the existing single-mock fake_client suffices. Tier-2-specific tests below
+# use score >= 60 with a two-call mock.
 MATERIAL = {
     "material": True,
     "axis": "permit",
-    "materiality_score": 75,
+    "materiality_score": 50,
     "confidence": 0.9,
     "summary": "Material change.",
 }
 NOT_MATERIAL = {**MATERIAL, "material": False, "materiality_score": 10, "confidence": 0.4}
+
+HIGH_MATERIAL = {**MATERIAL, "materiality_score": 80, "summary": "High-stakes change."}
+
+VALID_TRACE_PAYLOAD = {
+    "what_changed": "Demolition permit issued.",
+    "why_it_matters": "Adjacent demo changes assemblage assumptions for our thesis.",
+    "evidence": [
+        {
+            "label": "permit",
+            "source_url": "https://www.portlandmaps.com/detail/permit/12345/",
+            "snippet": "Demolition permit issued on adjacent parcel.",
+            "captured_at": None,
+        }
+    ],
+    "next_step": {
+        "action": "Reach out to demolition applicant.",
+        "urgency": "this_week",
+        "owner_role": "land_acquisition_lead",
+    },
+}
+
+
+def _fake_client_two_calls(t1: dict, t2: dict) -> SimpleNamespace:
+    """Returns Tier 1 then Tier 2 responses in order. Use for high-score paths."""
+    t1_block = SimpleNamespace(type="tool_use", name="materiality_screen", input=t1)
+    t2_block = SimpleNamespace(type="tool_use", name="decision_trace", input=t2)
+    create = AsyncMock(side_effect=[
+        SimpleNamespace(content=[t1_block]),
+        SimpleNamespace(content=[t2_block]),
+    ])
+    return SimpleNamespace(messages=SimpleNamespace(create=create))
 
 
 async def test_writes_alert_when_screen_says_material(db_session: AsyncSession):
@@ -138,9 +172,86 @@ async def test_writes_alert_when_screen_says_material(db_session: AsyncSession):
         )
     ).mappings().one()
     assert row["axis"] == "permit"
-    assert row["materiality_score"] == 75
+    assert row["materiality_score"] == 50
     assert row["classifier_tier"] == "haiku"
     assert str(parcel_id) in row["dedupe_key"]
+
+
+async def test_high_score_runs_tier_2_and_stores_sonnet_tier(db_session: AsyncSession):
+    """Score >= 60 → Tier 2 fires → alert flagged classifier_tier='sonnet'."""
+    event_id, _, wl_id = await _seed(db_session)
+    # Pre-seed a permit event near the parcel so Tier 2's allowed_urls includes
+    # the URL the trace mock returns.
+    await db_session.execute(
+        text(
+            "INSERT INTO events (source, external_id, payload_hash, event_type, "
+            "payload, geometry, occurred_at) "
+            "VALUES ('multco_permits', 'pm-12345', :h, 'permit.demolition', "
+            "CAST(:p AS jsonb), ST_GeomFromText('POINT(-100 40)', 4326), now())"
+        ),
+        {
+            "h": uuid4().bytes,
+            "p": '{"FOLDER_RSN": 12345, "WORK_TYPE": "Demolition"}',
+        },
+    )
+    await db_session.commit()
+
+    client = _fake_client_two_calls(HIGH_MATERIAL, VALID_TRACE_PAYLOAD)
+    written = await classify_event(event_id, db_session, anthropic_client=client)
+    assert written == 1
+    assert client.messages.create.await_count == 2
+    row = (
+        await db_session.execute(
+            text(
+                "SELECT classifier_tier, decision_trace "
+                "FROM alerts WHERE watchlist_id = :w"
+            ),
+            {"w": str(wl_id)},
+        )
+    ).mappings().one()
+    assert row["classifier_tier"] == "sonnet"
+    assert row["decision_trace"]["what_changed"] == "Demolition permit issued."
+    assert row["decision_trace"]["next_step"]["urgency"] == "this_week"
+
+
+async def test_low_score_skips_tier_2(db_session: AsyncSession):
+    """Score < 60 → only Tier 1 fires; alert tier stays 'haiku' with placeholder trace."""
+    event_id, _, wl_id = await _seed(db_session)
+    client = _fake_client(MATERIAL)  # score=50
+    written = await classify_event(event_id, db_session, anthropic_client=client)
+    assert written == 1
+    assert client.messages.create.await_count == 1
+    row = (
+        await db_session.execute(
+            text(
+                "SELECT classifier_tier, decision_trace "
+                "FROM alerts WHERE watchlist_id = :w"
+            ),
+            {"w": str(wl_id)},
+        )
+    ).mappings().one()
+    assert row["classifier_tier"] == "haiku"
+    assert row["decision_trace"]["placeholder"] is True
+
+
+async def test_tier_2_failure_falls_back_to_placeholder(db_session: AsyncSession):
+    """If Tier 2 returns invalid output, the alert still lands with placeholder trace."""
+    event_id, _, wl_id = await _seed(db_session)
+    bad_trace = {"what_changed": "x"}  # missing required fields
+    client = _fake_client_two_calls(HIGH_MATERIAL, bad_trace)
+    written = await classify_event(event_id, db_session, anthropic_client=client)
+    assert written == 1
+    row = (
+        await db_session.execute(
+            text(
+                "SELECT classifier_tier, decision_trace "
+                "FROM alerts WHERE watchlist_id = :w"
+            ),
+            {"w": str(wl_id)},
+        )
+    ).mappings().one()
+    assert row["classifier_tier"] == "haiku"
+    assert row["decision_trace"]["placeholder"] is True
 
 
 async def test_writes_no_alert_when_screen_says_not_material(db_session: AsyncSession):

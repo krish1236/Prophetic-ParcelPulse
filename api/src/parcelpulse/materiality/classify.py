@@ -1,16 +1,20 @@
-"""End-to-end classification pipeline: event → Tier 0 → Tier 1 → alerts.
+"""End-to-end classification pipeline: event → Tier 0 → Tier 1 → (Tier 2) → alerts.
 
-For each candidate produced by Tier 0, this worker calls Tier 1 and (if the
-event is material) writes an alert. Two-layer dedupe is enforced:
+For each Tier-0 candidate we run Tier 1 (Haiku materiality screen). If
+material AND `materiality_score >= TIER2_MATERIALITY_THRESHOLD`, we also
+run Tier 2 (Sonnet decision trace). The trace replaces the placeholder
+JSON in `alerts.decision_trace` and the alert's `classifier_tier` flips
+to `'sonnet'`.
+
+Two-layer dedupe is enforced:
   * event-layer: (source, external_id, payload_hash) UNIQUE on `events`
   * alert-layer: (watchlist_id, dedupe_key) UNIQUE on `alerts`
 
-Tier 1 calls are gated by a daily LLM spend cap. Once today's classifier
-spend hits `settings.daily_llm_cost_cap_usd`, the worker stops calling Haiku
-and skips remaining candidates (they stay in the events log for later runs).
-
-Phase 5 will plug in Tier 2 (Sonnet decision trace) below the same gate;
-for now we write a placeholder JSON to alerts.decision_trace.
+A daily LLM spend cap (`settings.daily_llm_cost_cap_usd`) gates BOTH tiers.
+Once today's spend hits the cap, the worker stops calling Haiku/Sonnet and
+remaining candidates stay in the events log for later runs. If Tier 2 fails
+(API error, validation, hallucinated URL), we still write the alert with the
+Tier 1 placeholder trace so the user sees the signal.
 """
 
 import logging
@@ -24,10 +28,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from parcelpulse.db import SessionLocal
 from parcelpulse.materiality.tier0 import find_candidates
-from parcelpulse.materiality.tier1 import screen
+from parcelpulse.materiality.tier1 import MaterialityScreen, screen
+from parcelpulse.materiality.tier2 import DecisionTrace, generate_trace
 from parcelpulse.settings import settings
 
 log = logging.getLogger(__name__)
+
+# Tier 2 (Sonnet) only fires above this Tier 1 score. Below, we keep the cheap
+# Haiku-only alert with a placeholder decision_trace.
+TIER2_MATERIALITY_THRESHOLD = 60
+
+_PLACEHOLDER_TRACE = '{"placeholder": true, "tier": "haiku"}'
 
 
 def alert_dedupe_key(source: str, external_id: str, parcel_id: UUID) -> str:
@@ -43,7 +54,7 @@ _INSERT_ALERT_SQL = text("""
     )
     VALUES (
         :wl, :pid, :eid, :axis, :score, :conf, :summary,
-        CAST(:trace AS jsonb), 'haiku', :dedupe
+        CAST(:trace AS jsonb), :tier, :dedupe
     )
     ON CONFLICT (watchlist_id, dedupe_key) DO NOTHING
     RETURNING alert_id
@@ -68,13 +79,44 @@ async def daily_cost_so_far(session: AsyncSession, day: date | None = None) -> f
     )
 
 
+async def _maybe_run_tier2(
+    *,
+    cand_event_id: UUID,
+    cand_parcel_id: UUID,
+    cand_watchlist_id: UUID,
+    session: AsyncSession,
+    screened: MaterialityScreen,
+    client: anthropic.AsyncAnthropic | None,
+) -> DecisionTrace | None:
+    """Run Tier 2 if score is high enough AND budget remains. Returns trace or None."""
+    if screened.materiality_score < TIER2_MATERIALITY_THRESHOLD:
+        return None
+    cost = await daily_cost_so_far(session)
+    if cost >= settings.daily_llm_cost_cap_usd:
+        log.warning(
+            "daily LLM cost cap reached before tier 2 (%.4f >= %.2f); "
+            "writing alert with placeholder trace",
+            cost,
+            settings.daily_llm_cost_cap_usd,
+        )
+        return None
+    return await generate_trace(
+        event_id=cand_event_id,
+        parcel_id=cand_parcel_id,
+        watchlist_id=cand_watchlist_id,
+        session=session,
+        tier1_screen=screened,
+        client=client,
+    )
+
+
 async def classify_event(
     event_id: UUID,
     session: AsyncSession,
     *,
     anthropic_client: anthropic.AsyncAnthropic | None = None,
 ) -> int:
-    """Run Tier 0 → Tier 1 for one event; write alerts. Returns alerts inserted."""
+    """Run Tier 0 → Tier 1 → (Tier 2) for one event; write alerts. Returns count inserted."""
     candidates = await find_candidates(event_id, session)
     if not candidates:
         return 0
@@ -109,6 +151,21 @@ async def classify_event(
         if screened is None or not screened.material:
             continue
 
+        trace = await _maybe_run_tier2(
+            cand_event_id=cand.event_id,
+            cand_parcel_id=cand.parcel_id,
+            cand_watchlist_id=cand.watchlist_id,
+            session=session,
+            screened=screened,
+            client=anthropic_client,
+        )
+        if trace is not None:
+            trace_json = trace.model_dump_json()
+            tier = "sonnet"
+        else:
+            trace_json = _PLACEHOLDER_TRACE
+            tier = "haiku"
+
         dedupe = alert_dedupe_key(
             event_meta["source"], event_meta["external_id"], cand.parcel_id
         )
@@ -122,8 +179,8 @@ async def classify_event(
                 "score": screened.materiality_score,
                 "conf": screened.confidence,
                 "summary": screened.summary,
-                # Phase 5 will replace this placeholder with a Sonnet decision trace.
-                "trace": '{"placeholder": true, "tier": "haiku"}',
+                "trace": trace_json,
+                "tier": tier,
                 "dedupe": dedupe,
             },
         )
