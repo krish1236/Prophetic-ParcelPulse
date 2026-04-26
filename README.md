@@ -27,56 +27,67 @@ flowchart LR
     end
 
     subgraph API["Backend (FastAPI + worker)"]
-        IN["Adapters → ingest.py<br/>(idempotent UNIQUE dedupe)"]
-        EV[("events<br/>append-only log")]
+        IN["Adapters → ingest.py<br/>idempotent UNIQUE dedupe"]
         T0["Tier 0<br/>spatial join + axis filter"]
         T1["Tier 1<br/>Haiku materiality screen"]
         T2["Tier 2<br/>Sonnet decision trace"]
-        CACHE[("classifier_cache<br/>tier=haiku/sonnet")]
-        AL[("alerts<br/>(watchlist, dedupe_key) UNIQUE")]
         REPLAY["replay.py<br/>cache-only mode"]
         ROUTES["routes/<br/>parcels · watchlists · alerts<br/>feed_geojson · replay · ops"]
     end
 
-    subgraph PG[("Postgres 16 + PostGIS 3.4")]
+    subgraph PG["Postgres 16 + PostGIS 3.4"]
         PARCELS[("parcels<br/>284k Multnomah")]
         WL[("watchlists +<br/>watched_parcels")]
+        EV[("events<br/>append-only log")]
+        CACHE[("classifier_cache<br/>tier=haiku/sonnet")]
+        AL[("alerts<br/>watchlist + dedupe_key UNIQUE")]
         RR[("replay_runs")]
     end
 
-    subgraph RD[("Redis 7")]
-        CB["circuit_breaker<br/>cb:{source}:*"]
-        RL["rate_limit<br/>rl:wl_create:{ip}"]
+    subgraph RD["Redis 7"]
+        CB["circuit_breaker<br/>cb:source:*"]
+        RL["rate_limit<br/>rl:wl_create:ip"]
     end
 
     subgraph WEB["Frontend (Next.js 16)"]
         LAND["/<br/>landing"]
-        WLPG["/w/[id]<br/>feed + map"]
-        DETAIL["/w/[id]/alert/[alertId]<br/>decision trace"]
-        REPL["/w/[id]/replay<br/>slider"]
+        WLPG["/w/id<br/>feed + map"]
+        DETAIL["/w/id/alert/alertId<br/>decision trace"]
+        REPL["/w/id/replay<br/>slider"]
         NEW["/w/new<br/>create + draw polygon"]
         OPS["/admin/ops<br/>dashboard"]
     end
 
-    S1 & S2 & S3 & S4 & S5 --> IN
+    S1 --> IN
+    S2 --> IN
+    S3 --> IN
+    S4 --> IN
+    S5 --> IN
+
     IN --> EV
     EV --> T0
     T0 -->|candidates| T1
     T1 --> CACHE
     T1 -->|score >= 60| T2
     T2 --> CACHE
-    T1 & T2 --> AL
-    REPLAY -->|cache-only lookup| CACHE
+    T1 --> AL
+    T2 --> AL
+    REPLAY --> CACHE
     REPLAY --> RR
 
-    PARCELS & WL & EV & CACHE & AL & RR -.persisted in.- PG
     IN -- record_failure --> CB
-    ROUTES -- check --> CB & RL
+    ROUTES -- check --> CB
+    ROUTES -- check --> RL
     AL --> ROUTES
     PARCELS --> ROUTES
     REPLAY --> ROUTES
 
-    LAND & WLPG & DETAIL & REPL & NEW & OPS -- fetch --> ROUTES
+    LAND --> ROUTES
+    WLPG --> ROUTES
+    DETAIL --> ROUTES
+    REPL --> ROUTES
+    NEW --> ROUTES
+    OPS --> ROUTES
 ```
 
 ## Request flow
