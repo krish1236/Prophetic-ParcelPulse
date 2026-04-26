@@ -9,11 +9,13 @@ export type OpsSourceStatus = {
 
 export type OpsIngestRow = { day: string; source: string; events: number };
 export type OpsCostRow = { day: string; tier: string; cost_usd: number };
+export type OpsAlertsRow = { day: string; axis: string; count: number };
 
 export type OpsMetrics = {
   sources: OpsSourceStatus[];
   ingest_by_day: OpsIngestRow[];
   cost_by_day: OpsCostRow[];
+  alerts_by_day: OpsAlertsRow[];
   cost_today_usd: number;
   cost_cap_usd: number;
 };

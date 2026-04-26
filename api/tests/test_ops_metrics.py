@@ -12,8 +12,17 @@ async def test_metrics_returns_sources_and_aggregates(http_client: httpx.AsyncCl
     assert "sources" in body and len(body["sources"]) > 0
     assert "ingest_by_day" in body
     assert "cost_by_day" in body
+    assert "alerts_by_day" in body
     assert body["cost_cap_usd"] == settings.daily_llm_cost_cap_usd
     assert "cost_today_usd" in body
+
+
+async def test_metrics_alerts_by_day_groups_per_axis(http_client: httpx.AsyncClient):
+    r = await http_client.get("/admin/ops/metrics")
+    rows = r.json()["alerts_by_day"]
+    for row in rows:
+        assert set(row.keys()) == {"day", "axis", "count"}
+        assert isinstance(row["count"], int)
 
 
 async def test_metrics_ingest_by_day_groups_per_source(

@@ -16,6 +16,7 @@ import {
 } from "recharts";
 
 import {
+  type OpsAlertsRow,
   type OpsCostRow,
   type OpsIngestRow,
   type OpsMetrics,
@@ -36,6 +37,13 @@ const TIER_COLORS: Record<string, string> = {
   haiku: "#0ea5e9",
   sonnet: "#a855f7",
   rules: "#71717a",
+};
+const AXIS_COLORS: Record<string, string> = {
+  permit: "#f59e0b",
+  flood: "#0ea5e9",
+  zoning: "#a855f7",
+  ownership: "#10b981",
+  market: "#f43f5e",
 };
 
 export default function OpsDashboardPage() {
@@ -120,9 +128,37 @@ export default function OpsDashboardPage() {
           >
             <CostChart rows={data.cost_by_day} cap={data.cost_cap_usd} />
           </Panel>
+          <Panel
+            title="Alert volume (last 30 days, by axis)"
+            help="A silent axis for >7 days = the source went bad."
+          >
+            <AlertsChart rows={data.alerts_by_day} />
+          </Panel>
         </div>
       )}
     </main>
+  );
+}
+
+function AlertsChart({ rows }: { rows: OpsAlertsRow[] }) {
+  const data = useMemo(() => pivotByDay(rows, "axis", "count"), [rows]);
+  const axes = useMemo(() => Array.from(new Set(rows.map((r) => r.axis))).sort(), [rows]);
+  return (
+    <ResponsiveContainer width="100%" height={260}>
+      <BarChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+        <XAxis dataKey="day" stroke="#71717a" fontSize={11} />
+        <YAxis stroke="#71717a" fontSize={11} allowDecimals={false} />
+        <Tooltip
+          contentStyle={{ background: "#0a0a0a", border: "1px solid #27272a" }}
+          labelStyle={{ color: "#d4d4d8" }}
+        />
+        <Legend wrapperStyle={{ fontSize: 11 }} />
+        {axes.map((a) => (
+          <Bar key={a} dataKey={a} stackId="alerts" fill={AXIS_COLORS[a] ?? "#9ca3af"} />
+        ))}
+      </BarChart>
+    </ResponsiveContainer>
   );
 }
 

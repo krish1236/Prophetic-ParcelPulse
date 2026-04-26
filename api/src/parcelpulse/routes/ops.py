@@ -64,6 +64,21 @@ async def metrics(
         )
     ).mappings().all()
 
+    alerts_by_day = (
+        await session.execute(
+            text("""
+                SELECT
+                    date_trunc('day', created_at AT TIME ZONE 'UTC')::date::text AS day,
+                    axis,
+                    count(*)::int AS count
+                FROM alerts
+                WHERE created_at >= now() - interval '30 days'
+                GROUP BY 1, 2
+                ORDER BY 1, 2
+            """)
+        )
+    ).mappings().all()
+
     today = datetime.now(UTC).date()
     cost_today = (
         await session.execute(
@@ -81,6 +96,7 @@ async def metrics(
         "sources": sources,
         "ingest_by_day": [dict(r) for r in ingest_by_day],
         "cost_by_day": [dict(r) for r in cost_by_day],
+        "alerts_by_day": [dict(r) for r in alerts_by_day],
         "cost_today_usd": cost_today,
         "cost_cap_usd": settings.daily_llm_cost_cap_usd,
     }
