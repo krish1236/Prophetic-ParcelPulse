@@ -10,11 +10,10 @@ Source name `fixture_zoning` is detected by the UI to render a "fixture data"
 badge on resulting alerts — the demo never claims fixture content is real.
 """
 
-import json
-from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, ClassVar, Literal
+from typing import ClassVar, Literal
 
+from parcelpulse.adapters._fixture import load_fixture_events
 from parcelpulse.adapters.base import CanonicalEvent
 
 FIXTURE_PATH = Path(__file__).parent.parent / "fixtures" / "zoning_events.json"
@@ -29,19 +28,6 @@ class FixtureZoningAdapter:
         self._fixture_path = fixture_path or FIXTURE_PATH
 
     async def fetch(self) -> list[CanonicalEvent]:
-        records: list[dict[str, Any]] = json.loads(self._fixture_path.read_text())
-        now = datetime.now(UTC)
-        events: list[CanonicalEvent] = []
-        for r in records:
-            occurred = now - timedelta(days=r.get("occurred_offset_days", 0))
-            events.append(
-                CanonicalEvent(
-                    source=self.name,
-                    external_id=r["external_id"],
-                    event_type=r["event_type"],
-                    payload=r["payload"],
-                    geometry=r.get("geometry"),
-                    occurred_at=occurred,
-                )
-            )
-        return events
+        return load_fixture_events(
+            source=self.name, fixture_path=self._fixture_path
+        )

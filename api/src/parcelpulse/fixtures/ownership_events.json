@@ -1,0 +1,33 @@
+[
+  {
+    "external_id": "MULT-DEED-2026-04321",
+    "event_type": "ownership.deed",
+    "occurred_offset_days": 4,
+    "summary": "Warranty deed recorded, ALPINE PARTNERS LLC → SUNRISE 18 LLC.",
+    "geometry": {"type": "Point", "coordinates": [-122.647761, 45.552438]},
+    "payload": {
+      "instrument_number": "2026-04321",
+      "deed_type": "warranty deed",
+      "grantor": "ALPINE PARTNERS LLC",
+      "grantee": "SUNRISE 18 LLC",
+      "consideration": 1875000,
+      "recorded_date": "2026-04-22",
+      "source_doc_url": "https://recordsweb.multco.us/instrument/2026-04321"
+    }
+  },
+  {
+    "external_id": "MULT-LLC-PER12345",
+    "event_type": "ownership.deed",
+    "occurred_offset_days": 12,
+    "summary": "Statement-of-Info filing changes mailing address for owner of 1200 NE BROADWAY.",
+    "geometry": {"type": "Point", "coordinates": [-122.652675, 45.534680]},
+    "payload": {
+      "filing_type": "Statement of Information",
+      "entity_name": "BROADWAY HOLDINGS NW LLC",
+      "old_address": "PO BOX 8821 PORTLAND OR",
+      "new_address": "411 SW 6TH AVE STE 1100 PORTLAND OR",
+      "filed_date": "2026-04-14",
+      "source_doc_url": "https://sos.oregon.gov/business/Search?bid=PER12345"
+    }
+  }
+]
