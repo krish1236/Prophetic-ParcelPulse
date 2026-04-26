@@ -15,6 +15,7 @@ dependencies = [
     "httpx>=0.28",
     "tenacity>=9.0",
     "apscheduler>=3.10",
+    "anthropic>=0.40",
 ]
 
 [project.scripts]
@@ -49,6 +50,9 @@ select = ["E", "F", "I", "B", "UP", "N"]
 "src/parcelpulse/main.py" = ["B008"]
 # Tests have inline WKT/SQL literals that don't fit 100 cols cleanly.
 "tests/*.py" = ["E501"]
+# Materiality prompts are long-form natural language; line-wrapping them
+# obscures the contract sent to the model.
+"src/parcelpulse/materiality/*.py" = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
