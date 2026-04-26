@@ -146,3 +146,52 @@ export async function postReplay(req: {
   if (!res.ok) throw new Error(`replay failed: ${res.status}`);
   return (await res.json()) as ReplayResponse;
 }
+
+export type WatchlistDetail = {
+  watchlist_id: string;
+  name: string;
+  deal_thesis: string;
+  parcel_count: number;
+  alert_count: number;
+  created_at: string;
+};
+
+export type AddParcelsResponse = {
+  added: number;
+  not_found: number;
+  total_watched: number;
+};
+
+export async function createWatchlist(req: {
+  name: string;
+  deal_thesis: string;
+}): Promise<WatchlistDetail> {
+  const res = await fetch(`${API_BASE_URL}/watchlists`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`watchlist create failed: ${res.status} ${text}`);
+  }
+  return (await res.json()) as WatchlistDetail;
+}
+
+export async function addParcels(
+  watchlistId: string,
+  req: { apns?: string[]; polygon?: GeoJSON.Polygon },
+): Promise<AddParcelsResponse> {
+  const res = await fetch(`${API_BASE_URL}/watchlists/${watchlistId}/parcels`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`add parcels failed: ${res.status} ${text}`);
+  }
+  return (await res.json()) as AddParcelsResponse;
+}

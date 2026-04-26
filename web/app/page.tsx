@@ -24,12 +24,21 @@ export default async function Home() {
           <h2 className="font-mono text-xs uppercase tracking-[0.2em] text-zinc-500">
             Recent alerts
           </h2>
-          <Link
-            href={`/w/${DEMO_WATCHLIST_ID}`}
-            className="font-mono text-xs text-zinc-400 transition hover:text-zinc-200"
-          >
-            see full demo watchlist →
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/w/new"
+              className="font-mono text-xs text-zinc-400 transition hover:text-zinc-200"
+            >
+              create your own →
+            </Link>
+            <span className="text-zinc-700">·</span>
+            <Link
+              href={`/w/${DEMO_WATCHLIST_ID}`}
+              className="font-mono text-xs text-zinc-400 transition hover:text-zinc-200"
+            >
+              see demo →
+            </Link>
+          </div>
         </div>
 
         {feed.items.length === 0 ? (
