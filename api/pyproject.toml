@@ -17,6 +17,7 @@ dependencies = [
     "apscheduler>=3.10",
     "anthropic>=0.40",
     "redis>=5.2",
+    "structlog>=24.4",
 ]
 
 [project.scripts]

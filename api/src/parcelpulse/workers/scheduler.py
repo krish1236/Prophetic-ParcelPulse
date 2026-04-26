@@ -96,10 +96,9 @@ async def run_scheduler() -> None:
 
 
 def main() -> None:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s %(message)s",
-    )
+    from parcelpulse.observability import configure_logging
+
+    configure_logging()
     asyncio.run(run_scheduler())
 
 

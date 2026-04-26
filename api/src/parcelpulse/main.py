@@ -4,9 +4,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from parcelpulse.db import get_session
 from parcelpulse.health import source_status
+from parcelpulse.observability import configure_logging
 from parcelpulse.registry import all_adapters
 from parcelpulse.routes import alerts, feed_geojson, parcels, replay, watchlists
 from parcelpulse.settings import settings
+
+configure_logging()
 
 app = FastAPI(title="ParcelPulse", version="0.1.0")
 
