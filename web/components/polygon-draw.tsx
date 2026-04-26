@@ -12,6 +12,51 @@ const PORTLAND_CENTER: [number, number] = [-122.66, 45.535];
 const PORTLAND_ZOOM = 11;
 const MAX_VERTICES = 50;
 
+// MapboxDraw's default styles use `line-dasharray: [2, 2]` which MapLibre v5
+// rejects (it now requires `["literal", [2, 2]]`). We sidestep with a minimal
+// dashless style set covering active/inactive polygon fill, polygon stroke,
+// and vertex points. Cosmetic loss is the dashed "in-progress" outline.
+const DRAW_STYLES: Array<Record<string, unknown>> = [
+  {
+    id: "gl-draw-polygon-fill",
+    type: "fill",
+    filter: ["all", ["==", "$type", "Polygon"]],
+    paint: { "fill-color": "#3b82f6", "fill-outline-color": "#3b82f6", "fill-opacity": 0.18 },
+  },
+  {
+    id: "gl-draw-polygon-stroke",
+    type: "line",
+    filter: ["all", ["==", "$type", "Polygon"]],
+    layout: { "line-cap": "round", "line-join": "round" },
+    paint: { "line-color": "#3b82f6", "line-width": 2 },
+  },
+  {
+    id: "gl-draw-line",
+    type: "line",
+    filter: ["all", ["==", "$type", "LineString"]],
+    layout: { "line-cap": "round", "line-join": "round" },
+    paint: { "line-color": "#3b82f6", "line-width": 2 },
+  },
+  {
+    id: "gl-draw-polygon-and-line-vertex-halo-active",
+    type: "circle",
+    filter: ["all", ["==", "meta", "vertex"], ["==", "$type", "Point"]],
+    paint: { "circle-radius": 6, "circle-color": "#0a0a0a" },
+  },
+  {
+    id: "gl-draw-polygon-and-line-vertex-active",
+    type: "circle",
+    filter: ["all", ["==", "meta", "vertex"], ["==", "$type", "Point"]],
+    paint: { "circle-radius": 4, "circle-color": "#3b82f6" },
+  },
+  {
+    id: "gl-draw-point-active",
+    type: "circle",
+    filter: ["all", ["==", "$type", "Point"], ["==", "active", "true"], ["!=", "meta", "midpoint"]],
+    paint: { "circle-radius": 5, "circle-color": "#3b82f6" },
+  },
+];
+
 export function PolygonDraw({
   onChange,
   className,
@@ -46,6 +91,7 @@ export function PolygonDraw({
       displayControlsDefault: false,
       controls: { polygon: true, trash: true },
       defaultMode: "draw_polygon",
+      styles: DRAW_STYLES as unknown as MapboxDraw.DrawCustomMode[],
     });
     drawRef.current = draw;
     map.addControl(draw as unknown as maplibregl.IControl, "top-left");
