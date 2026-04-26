@@ -2,12 +2,14 @@
 
 Every adapter — scheduled, webhook, fixture — funnels into `insert_events()`.
 Dedupe is enforced at the DB layer via the UNIQUE (source, external_id, payload_hash)
-constraint and `ON CONFLICT DO NOTHING`. The function returns the number of rows
-*actually* inserted, so callers can log and surface ingest growth.
+constraint and `ON CONFLICT DO NOTHING`. The function returns the IDs of rows
+*actually* inserted (length = new-row count) so callers can both log growth
+and hand the new IDs straight to the classifier.
 """
 
 import json
 from collections.abc import Sequence
+from uuid import UUID
 
 from sqlalchemy import text
 
@@ -42,9 +44,9 @@ _INSERT_SQL = text("""
 """)
 
 
-async def insert_events(events: Sequence[CanonicalEvent]) -> int:
+async def insert_events(events: Sequence[CanonicalEvent]) -> list[UUID]:
     if not events:
-        return 0
+        return []
     rows = [
         {
             "source": e.source,
@@ -60,4 +62,4 @@ async def insert_events(events: Sequence[CanonicalEvent]) -> int:
     async with SessionLocal() as session:
         result = await session.execute(_INSERT_SQL, {"rows": json.dumps(rows)})
         await session.commit()
-        return len(result.fetchall())
+        return [row[0] for row in result.fetchall()]

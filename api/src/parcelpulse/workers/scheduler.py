@@ -16,27 +16,39 @@ from apscheduler.triggers.cron import CronTrigger
 
 from parcelpulse.adapters.base import SourceAdapter
 from parcelpulse.ingest import insert_events
+from parcelpulse.materiality.classify import classify_events
 from parcelpulse.registry import all_adapters
 
 log = logging.getLogger(__name__)
 
 
-async def run_adapter_once(adapter: SourceAdapter) -> tuple[int, int]:
-    """Pull from one adapter and ingest. Returns (fetched, newly_inserted)."""
+async def run_adapter_once(adapter: SourceAdapter) -> tuple[int, int, int]:
+    """Pull → ingest → classify for one adapter. Returns (fetched, inserted, alerted)."""
     try:
         events = await adapter.fetch()
     except Exception:
         log.exception("adapter=%s fetch failed", adapter.name)
-        return 0, 0
+        return 0, 0, 0
     try:
-        inserted = await insert_events(events)
+        new_ids = await insert_events(events)
     except Exception:
         log.exception("adapter=%s insert failed (fetched=%d)", adapter.name, len(events))
-        return len(events), 0
+        return len(events), 0, 0
+    inserted = len(new_ids)
+    alerted = 0
+    if new_ids:
+        try:
+            alerted = await classify_events(new_ids)
+        except Exception:
+            log.exception("adapter=%s classify failed (inserted=%d)", adapter.name, inserted)
     log.info(
-        "adapter=%s fetched=%d inserted=%d", adapter.name, len(events), inserted
+        "adapter=%s fetched=%d inserted=%d alerted=%d",
+        adapter.name,
+        len(events),
+        inserted,
+        alerted,
     )
-    return len(events), inserted
+    return len(events), inserted, alerted
 
 
 async def run_scheduler() -> None:

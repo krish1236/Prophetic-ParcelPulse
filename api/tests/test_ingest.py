@@ -31,14 +31,14 @@ async def _clean_test_events(db_session: AsyncSession):
     await db_session.commit()
 
 
-async def test_insert_events_empty_returns_zero():
-    assert await insert_events([]) == 0
+async def test_insert_events_empty_returns_empty_list():
+    assert await insert_events([]) == []
 
 
 async def test_insert_events_inserts_new_rows(db_session: AsyncSession):
     events = [_ev(str(uuid4())) for _ in range(3)]
-    inserted = await insert_events(events)
-    assert inserted == 3
+    new_ids = await insert_events(events)
+    assert len(new_ids) == 3
     count = (
         await db_session.execute(
             text("SELECT count(*) FROM events WHERE source = :s"), {"s": TEST_SOURCE}
@@ -51,8 +51,8 @@ async def test_insert_events_is_idempotent(db_session: AsyncSession):
     events = [_ev(str(uuid4())) for _ in range(3)]
     first = await insert_events(events)
     second = await insert_events(events)
-    assert first == 3
-    assert second == 0
+    assert len(first) == 3
+    assert len(second) == 0
     count = (
         await db_session.execute(
             text("SELECT count(*) FROM events WHERE source = :s"), {"s": TEST_SOURCE}
@@ -65,9 +65,9 @@ async def test_insert_events_treats_payload_change_as_new(db_session: AsyncSessi
     ext = str(uuid4())
     first = await insert_events([_ev(ext, payload={"value": 1})])
     second = await insert_events([_ev(ext, payload={"value": 2})])
-    assert first == 1
+    assert len(first) == 1
     # Different payload_hash → different row, not a conflict.
-    assert second == 1
+    assert len(second) == 1
 
 
 async def test_insert_events_persists_geometry(db_session: AsyncSession):
