@@ -15,6 +15,10 @@ export function scoreTone(score: number): string {
   return "text-zinc-500";
 }
 
+export function isFixtureSource(source: string): boolean {
+  return source.startsWith("fixture_");
+}
+
 export function formatRelativeTime(iso: string): string {
   const then = new Date(iso).getTime();
   const now = Date.now();

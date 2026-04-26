@@ -114,6 +114,7 @@ async def replay_window(
                     "event_id": str(ev["event_id"]),
                     "parcel_id": str(cand.parcel_id),
                     "parcel_apn": apn,
+                    "event_source": ev["source"],
                     "axis": screened.axis,
                     "materiality_score": screened.materiality_score,
                     "confidence": screened.confidence,

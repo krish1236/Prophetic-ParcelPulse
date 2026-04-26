@@ -1,12 +1,13 @@
 import Link from "next/link";
 
+import { FixtureBadge } from "@/components/fixture-badge";
 import {
   DEMO_WATCHLIST_ID,
   type AlertSummary,
   fetchHealth,
   fetchWatchlistFeed,
 } from "@/lib/api";
-import { AXIS_STYLES, formatRelativeTime, scoreTone } from "@/lib/ui";
+import { AXIS_STYLES, formatRelativeTime, isFixtureSource, scoreTone } from "@/lib/ui";
 
 export default async function Home() {
   const [health, feed] = await Promise.all([
@@ -86,6 +87,7 @@ function HealthBadge({ ok, status }: { ok: boolean; status: string }) {
 
 function AlertPreview({ alert }: { alert: AlertSummary }) {
   const axisStyle = AXIS_STYLES[alert.axis];
+  const fixture = isFixtureSource(alert.event_source);
   return (
     <Link
       href={`/w/${DEMO_WATCHLIST_ID}/alert/${alert.alert_id}`}
@@ -104,10 +106,11 @@ function AlertPreview({ alert }: { alert: AlertSummary }) {
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm leading-snug text-zinc-200">{alert.summary}</p>
-          <p className="mt-0.5 truncate font-mono text-[11px] text-zinc-500">
-            {alert.parcel_apn.trim()}
-            <span className="px-2 text-zinc-700">·</span>
-            {formatRelativeTime(alert.created_at)}
+          <p className="mt-0.5 flex items-center gap-2 truncate font-mono text-[11px] text-zinc-500">
+            <span className="truncate">{alert.parcel_apn.trim()}</span>
+            <span className="text-zinc-700">·</span>
+            <span>{formatRelativeTime(alert.created_at)}</span>
+            {fixture && <FixtureBadge />}
           </p>
         </div>
       </div>

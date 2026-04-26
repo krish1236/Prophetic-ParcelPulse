@@ -49,10 +49,12 @@ async def get_feed(
     items_sql = text(f"""
         SELECT
             a.alert_id, a.watchlist_id, a.parcel_id, p.apn AS parcel_apn,
-            a.triggering_event_id, a.axis, a.materiality_score, a.confidence,
+            a.triggering_event_id, e.source AS event_source,
+            a.axis, a.materiality_score, a.confidence,
             a.summary, a.classifier_tier, a.created_at
         FROM alerts a
         JOIN parcels p ON p.parcel_id = a.parcel_id
+        JOIN events e ON e.event_id = a.triggering_event_id
         WHERE {where}
         ORDER BY a.created_at DESC, a.alert_id
         LIMIT :limit OFFSET :offset

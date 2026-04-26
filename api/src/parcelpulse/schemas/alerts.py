@@ -14,6 +14,7 @@ class AlertSummary(BaseModel):
     parcel_id: UUID
     parcel_apn: str
     triggering_event_id: UUID
+    event_source: str
     axis: Axis
     materiality_score: int
     confidence: float

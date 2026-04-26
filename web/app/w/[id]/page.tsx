@@ -1,8 +1,9 @@
 import Link from "next/link";
 
+import { FixtureBadge } from "@/components/fixture-badge";
 import { ParcelMap } from "@/components/parcel-map";
 import { type AlertSummary, fetchWatchlistFeed } from "@/lib/api";
-import { AXIS_STYLES, formatRelativeTime, scoreTone } from "@/lib/ui";
+import { AXIS_STYLES, formatRelativeTime, isFixtureSource, scoreTone } from "@/lib/ui";
 
 export default async function WatchlistPage({
   params,
@@ -102,6 +103,7 @@ function AlertRow({
   alert: AlertSummary;
 }) {
   const axisStyle = AXIS_STYLES[alert.axis];
+  const fixture = isFixtureSource(alert.event_source);
   return (
     <Link
       href={`/w/${watchlistId}/alert/${alert.alert_id}`}
@@ -120,10 +122,11 @@ function AlertRow({
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-sm leading-snug text-zinc-100">{alert.summary}</p>
-          <p className="mt-1 font-mono text-xs text-zinc-500">
+          <p className="mt-1 flex flex-wrap items-center gap-x-2 font-mono text-xs text-zinc-500">
             <span className="tabular-nums">{alert.parcel_apn.trim()}</span>
-            <span className="px-2 text-zinc-700">·</span>
+            <span className="text-zinc-700">·</span>
             <span>{formatRelativeTime(alert.created_at)}</span>
+            {fixture && <FixtureBadge />}
           </p>
         </div>
       </div>

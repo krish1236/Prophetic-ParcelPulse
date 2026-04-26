@@ -24,6 +24,7 @@ export type AlertSummary = {
   parcel_id: string;
   parcel_apn: string;
   triggering_event_id: string;
+  event_source: string;
   axis: Axis;
   materiality_score: number;
   confidence: number;
@@ -110,6 +111,7 @@ export type ReplayAlert = {
   event_id: string;
   parcel_id: string;
   parcel_apn: string;
+  event_source: string;
   axis: Axis;
   materiality_score: number;
   confidence: number;
