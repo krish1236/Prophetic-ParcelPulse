@@ -28,11 +28,11 @@ MATERIAL_EVENT_TYPES: frozenset[str] = frozenset(
         "permit.addition",
         "permit.repair",
         "permit.other",
-        # Future axes (Phase 8)
-        "zoning.amendment",
-        "zoning.overlay",
+        # Phase 8 axes
         "flood.lomr",
         "flood.loma",
+        "zoning.amendment",
+        "zoning.overlay",
         "ownership.deed",
         "ownership.listing",
         "market.comp",
