@@ -1,0 +1,48 @@
+[
+  {
+    "external_id": "PDX-ORD-191234",
+    "event_type": "zoning.amendment",
+    "occurred_offset_days": 6,
+    "summary": "Council Ordinance 191234 reduces ADU max count in RM3 zones from 4 to 2.",
+    "geometry": {"type": "Point", "coordinates": [-122.683361, 45.566808]},
+    "payload": {
+      "ordinance": "191234",
+      "title": "Inner Northeast ADU density rollback",
+      "zone_affected": "RM3",
+      "effective_date": "2026-04-20",
+      "summary": "Reduces ADU max count from 4 to 2 in RM3-zoned lots within the Albina Plan area.",
+      "source_doc_url": "https://efiles.portlandoregon.gov/record/15522123/"
+    }
+  },
+  {
+    "external_id": "PDX-ORD-191298",
+    "event_type": "zoning.overlay",
+    "occurred_offset_days": 18,
+    "summary": "New design overlay zone 'd' applied to NE Broadway corridor parcels.",
+    "geometry": {"type": "Point", "coordinates": [-122.652675, 45.534680]},
+    "payload": {
+      "ordinance": "191298",
+      "title": "NE Broadway design overlay extension",
+      "zone_affected": "CX",
+      "overlay_added": "d",
+      "effective_date": "2026-04-08",
+      "summary": "Applies the design (d) overlay to CX-zoned parcels along NE Broadway between 7th and 16th.",
+      "source_doc_url": "https://efiles.portlandoregon.gov/record/15531888/"
+    }
+  },
+  {
+    "external_id": "PDX-ORD-191305",
+    "event_type": "zoning.amendment",
+    "occurred_offset_days": 31,
+    "summary": "RM2 lot-coverage cap raised from 50% to 60% in qualifying transit corridors.",
+    "geometry": {"type": "Point", "coordinates": [-122.663163, 45.550176]},
+    "payload": {
+      "ordinance": "191305",
+      "title": "Transit corridor lot coverage update",
+      "zone_affected": "RM2",
+      "effective_date": "2026-03-26",
+      "summary": "Raises lot coverage from 50% to 60% for RM2 parcels within 0.25 miles of frequent transit.",
+      "source_doc_url": "https://efiles.portlandoregon.gov/record/15527014/"
+    }
+  }
+]
