@@ -27,3 +27,22 @@ class AlertFeedResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class AlertDetail(BaseModel):
+    alert_id: UUID
+    watchlist_id: UUID
+    parcel_id: UUID
+    parcel_apn: str
+    parcel_address: str | None = None
+    triggering_event_id: UUID
+    event_source: str
+    event_type: str
+    event_payload: dict
+    axis: Axis
+    materiality_score: int
+    confidence: float
+    summary: str
+    decision_trace: dict
+    classifier_tier: ClassifierTier
+    created_at: datetime
