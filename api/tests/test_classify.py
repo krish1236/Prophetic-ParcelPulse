@@ -100,6 +100,12 @@ async def _cleanup(db_session: AsyncSession):
     await db_session.execute(
         text("DELETE FROM events WHERE source = 'test_source'")
     )
+    # The high-score test deliberately inserts an event with source='multco_permits'
+    # so Tier 2's allowed_urls helper can build a FOLDER_RSN URL. Clean it up by
+    # the unique external_id so we don't leak into the real multco_permits log.
+    await db_session.execute(
+        text("DELETE FROM events WHERE source = 'multco_permits' AND external_id = 'pm-12345'")
+    )
     await db_session.execute(text("DELETE FROM classifier_cache"))
     await db_session.commit()
 
