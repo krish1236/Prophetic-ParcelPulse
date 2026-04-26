@@ -5,15 +5,21 @@ call against `classifier_cache`. We never call the live LLM during replay,
 which makes results free *and* deterministic. The Phase 7 replay slider
 depends on this property.
 
+Each run writes a `replay_runs` row (run_id, watchlist_id, window, alert_count,
+cache_hit_pct, ran_at) so the UI can show provenance under the slider —
+"ran in 320ms · 87% cache hit · 14 alerts" — and so future audits can compare
+replays side-by-side.
+
 Cache misses (events that were never classified live, or for which the
 watchlist's thesis_version has bumped) are reported in the response so the
 UI can show "N alert candidates skipped — not classified at the time"
 without silently dropping them.
 """
 
-from datetime import datetime
+import time
+from datetime import UTC, datetime
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,6 +40,7 @@ async def replay_window(
     to_ts: datetime,
     session: AsyncSession,
 ) -> dict[str, Any]:
+    started = time.monotonic()
     event_rows = (
         await session.execute(
             text("""
@@ -49,6 +56,7 @@ async def replay_window(
     seen_dedupe: set[str] = set()
     alerts: list[dict[str, Any]] = []
     candidate_total = 0
+    cache_hits = 0
     cache_misses = 0
 
     for ev in event_rows:
@@ -70,6 +78,7 @@ async def replay_window(
             if screened is None:
                 cache_misses += 1
                 continue
+            cache_hits += 1
             if not screened.material:
                 continue
 
@@ -114,10 +123,39 @@ async def replay_window(
                 }
             )
 
+    duration_ms = int((time.monotonic() - started) * 1000)
+    lookups = cache_hits + cache_misses
+    cache_hit_pct = round(cache_hits / lookups * 100, 1) if lookups else 100.0
+
+    run_id = uuid4()
+    ran_at = datetime.now(UTC)
+    await session.execute(
+        text("""
+            INSERT INTO replay_runs (
+                run_id, watchlist_id, from_ts, to_ts, alert_count, cache_hit_pct, ran_at
+            )
+            VALUES (:rid, :wl, :from_ts, :to_ts, :ac, :pct, :ran)
+        """),
+        {
+            "rid": str(run_id),
+            "wl": str(watchlist_id),
+            "from_ts": from_ts,
+            "to_ts": to_ts,
+            "ac": len(alerts),
+            "pct": cache_hit_pct,
+            "ran": ran_at,
+        },
+    )
+    await session.commit()
+
     return {
+        "run_id": str(run_id),
         "from_ts": from_ts.isoformat(),
         "to_ts": to_ts.isoformat(),
         "alerts": alerts,
         "candidate_total": candidate_total,
         "skipped_for_cache_miss": cache_misses,
+        "cache_hit_pct": cache_hit_pct,
+        "duration_ms": duration_ms,
+        "ran_at": ran_at.isoformat(),
     }

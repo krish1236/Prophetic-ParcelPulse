@@ -86,6 +86,14 @@ async def _seed_world(
 @pytest_asyncio.fixture(autouse=True)
 async def _cleanup(db_session: AsyncSession):
     yield
+    # replay_runs FK references watchlists; delete it first.
+    await db_session.execute(
+        text(
+            "DELETE FROM replay_runs WHERE watchlist_id IN "
+            "(SELECT watchlist_id FROM watchlists WHERE workspace_id = :ws)"
+        ),
+        {"ws": str(TEST_WORKSPACE)},
+    )
     await db_session.execute(
         text(
             "DELETE FROM watched_parcels WHERE watchlist_id IN "
