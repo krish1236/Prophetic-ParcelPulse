@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { addParcels, createWatchlist } from "@/lib/api";
+import { rememberWatchlist } from "@/lib/visitor";
 
 // Polygon draw is heavy (mapbox-gl-draw + maplibre); load it client-side only
 // so the form's initial paint isn't blocked.
@@ -58,6 +59,11 @@ export default function NewWatchlistPage() {
     setSubmitting(true);
     try {
       const wl = await createWatchlist({ name: name.trim(), deal_thesis: thesis.trim() });
+      rememberWatchlist({
+        watchlist_id: wl.watchlist_id,
+        name: wl.name,
+        created_at: wl.created_at,
+      });
       const req =
         mode === "polygon" && polygon ? { polygon } : apns.length > 0 ? { apns } : null;
       if (req) {

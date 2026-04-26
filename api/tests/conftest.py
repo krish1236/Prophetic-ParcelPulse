@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from parcelpulse.db import SessionLocal, engine
 from parcelpulse.main import app
+from parcelpulse.rate_limit import reset as rl_reset
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -24,6 +25,16 @@ async def _isolate_engine_pool():
     # connections raise "Event loop is closed" on teardown. Dispose between tests.
     yield
     await engine.dispose()
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def _reset_test_rate_limits():
+    # ASGITransport reports client.host as 'testclient' so any test that calls
+    # POST /watchlists shares one limiter key. Reset both before and after so
+    # neither prior-test residue nor this test's own bumps bleed across.
+    await rl_reset("rl:wl_create:127.0.0.1")
+    yield
+    await rl_reset("rl:wl_create:127.0.0.1")
 
 TEST_COUNTY_FIPS = "99999"
 TEST_APN = "TEST-APN-1"

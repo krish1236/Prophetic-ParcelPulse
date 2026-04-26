@@ -3,11 +3,12 @@ from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from parcelpulse.db import get_session
+from parcelpulse.rate_limit import check_and_increment
 from parcelpulse.schemas.alerts import (
     AlertFeedResponse,
     AlertSummary,
@@ -16,6 +17,7 @@ from parcelpulse.schemas.alerts import (
     WatchlistCreateRequest,
     WatchlistDetail,
 )
+from parcelpulse.settings import settings
 
 router = APIRouter(prefix="/watchlists", tags=["watchlists"])
 
@@ -85,11 +87,36 @@ async def get_feed(
     )
 
 
+def _client_ip(request: Request) -> str:
+    """Best-effort IP for rate-limit keying. Honors X-Forwarded-For if present
+    (Phase 11 sets the proxy in front of Railway)."""
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
 @router.post("", response_model=WatchlistDetail)
 async def create_watchlist(
     req: WatchlistCreateRequest,
+    request: Request,
     session: AsyncSession = Depends(get_session),
 ) -> WatchlistDetail:
+    ip = _client_ip(request)
+    allowed, count = await check_and_increment(
+        f"rl:wl_create:{ip}",
+        limit=settings.watchlist_create_rate_limit,
+        window_seconds=settings.watchlist_create_rate_window_seconds,
+    )
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                f"rate limit exceeded ({count} > "
+                f"{settings.watchlist_create_rate_limit} per "
+                f"{settings.watchlist_create_rate_window_seconds // 60}min)"
+            ),
+        )
     row = (
         await session.execute(
             text("""

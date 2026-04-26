@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { FixtureBadge } from "@/components/fixture-badge";
+import { RecentWatchlists } from "@/components/recent-watchlists";
 import {
   DEMO_WATCHLIST_ID,
   type AlertSummary,
@@ -19,7 +20,9 @@ export default async function Home() {
     <main className="mx-auto w-full max-w-3xl px-6 py-16">
       <Hero ok={health.ok} status={health.status} />
 
-      <section className="mt-16">
+      <RecentWatchlists />
+
+      <section className="mt-12">
         <div className="mb-4 flex items-baseline justify-between">
           <h2 className="font-mono text-xs uppercase tracking-[0.2em] text-zinc-500">
             Recent alerts

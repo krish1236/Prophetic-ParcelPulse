@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     circuit_breaker_failure_threshold: int = 3
     circuit_breaker_failure_window_seconds: int = 300
     circuit_breaker_pause_seconds: int = 900
+    # Rate limit on visitor-created watchlists.
+    watchlist_create_rate_limit: int = 5
+    watchlist_create_rate_window_seconds: int = 3600
 
 
 settings = Settings()
