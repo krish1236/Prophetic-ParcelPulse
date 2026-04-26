@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 
 import { DecisionTrace, type Trace } from "@/components/decision-trace";
 import { type AlertDetail, fetchAlert } from "@/lib/api";
-import { AXIS_STYLES, formatRelativeTime, scoreTone } from "@/lib/ui";
+import { AXIS_STYLES, formatRelativeTime, scoreTone, tierLabel } from "@/lib/ui";
 
 export default async function AlertDetailPage({
   params,
@@ -75,7 +75,7 @@ export default async function AlertDetailPage({
           <span className="px-2 text-zinc-700">·</span>
           <span>{formatRelativeTime(alert.created_at)}</span>
           <span className="px-2 text-zinc-700">·</span>
-          <span className="uppercase">{alert.classifier_tier}</span>
+          <span className="uppercase">{tierLabel(alert.classifier_tier)}</span>
         </p>
       </header>
 

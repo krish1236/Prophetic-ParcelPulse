@@ -1,13 +1,12 @@
 # ParcelPulse
 
-Event-sourced change feed and decision-alert engine for parcel watchlists. Land
-acquisition teams at homebuilders track hundreds of parcels at once. Permits,
-zoning, ownership, FEMA flood maps, and listings all change quietly across
-3,000+ counties — by the time a deal slips, the signal was usually sitting in
-some county portal nobody was watching. ParcelPulse pulls those signals,
-spatially attributes them to watched parcels, runs a tiered LLM materiality
-screen against the user's deal thesis, and surfaces ranked, evidenced
-"act on this" alerts.
+A working proof-of-concept for the next layer of Prophetic's LRM-style "watch
+this parcel and alert me on changes" workflow. LRM already markets monitoring
+across permits, zoning, listings, and other axes — this build explores what
+those alerts could look like when each one is **screened by an LLM against
+the user's plain-English deal thesis**, **rendered as a structured decision
+trace pinned to source records**, and **replayable deterministically over
+any historical window**.
 
 Two audiences in one product:
 
@@ -29,8 +28,8 @@ flowchart LR
     subgraph API["Backend (FastAPI + worker)"]
         IN["Adapters → ingest.py<br/>idempotent UNIQUE dedupe"]
         T0["Tier 0<br/>spatial join + axis filter"]
-        T1["Tier 1<br/>Haiku materiality screen"]
-        T2["Tier 2<br/>Sonnet decision trace"]
+        T1["Tier 1<br/>materiality screen"]
+        T2["Tier 2<br/>decision trace"]
         REPLAY["replay.py<br/>cache-only mode"]
         ROUTES["routes/<br/>parcels · watchlists · alerts<br/>feed_geojson · replay · ops"]
     end
@@ -39,7 +38,7 @@ flowchart LR
         PARCELS[("parcels<br/>284k Multnomah")]
         WL[("watchlists +<br/>watched_parcels")]
         EV[("events<br/>append-only log")]
-        CACHE[("classifier_cache<br/>tier=haiku/sonnet")]
+        CACHE[("classifier_cache<br/>tier 1 / tier 2")]
         AL[("alerts<br/>watchlist + dedupe_key UNIQUE")]
         RR[("replay_runs")]
     end
@@ -101,8 +100,8 @@ sequenceDiagram
     participant ING as ingest.insert_events
     participant DB as events table
     participant T0 as Tier 0 (SQL)
-    participant T1 as Tier 1 (Haiku)
-    participant T2 as Tier 2 (Sonnet)
+    participant T1 as Tier 1 (materiality)
+    participant T2 as Tier 2 (decision trace)
     participant CACHE as classifier_cache
     participant AL as alerts table
 
@@ -121,18 +120,18 @@ sequenceDiagram
             alt cache hit
                 CACHE-->>T1: MaterialityScreen
             else cache miss
-                T1->>T1: Haiku.create(tool=materiality_screen)
-                T1->>CACHE: cache_put(haiku, cost_usd)
+                T1->>T1: LLM call (tool=materiality_screen)
+                T1->>CACHE: cache_put(tier 1, cost_usd)
             end
 
             alt material AND score >= 60
-                T2->>CACHE: lookup (sonnet variant of key)
+                T2->>CACHE: lookup (tier 2 variant of key)
                 alt cache hit
                     CACHE-->>T2: DecisionTrace
                 else cache miss
-                    T2->>T2: Sonnet.create(tool=decision_trace, allowed_urls=[...])
+                    T2->>T2: LLM call (tool=decision_trace, allowed_urls=[...])
                     Note over T2: Reject hallucinated source_urls
-                    T2->>CACHE: cache_put(sonnet, cost_usd)
+                    T2->>CACHE: cache_put(tier 2, cost_usd)
                 end
             end
 
@@ -172,9 +171,9 @@ flowchart TD
 | --- | --- | --- |
 | Append-only event log + projections | `api/src/parcelpulse/models.py`, `ingest.py` | Replay determinism; same input → same output years later |
 | Two-layer dedupe (event + alert) | `events.UNIQUE(source,external_id,payload_hash)`, `alerts.UNIQUE(watchlist_id,dedupe_key)` | Source noise (same record 3×) and cross-source duplicates both collapse |
-| Tiered classifier (Tier 0 → 1 → 2) | `materiality/tier0.py`, `tier1.py`, `tier2.py`, `classify.py` | ~70% rejected free at Tier 0; only high-score alerts pay for Sonnet |
+| Tiered classifier (Tier 0 → 1 → 2) | `materiality/tier0.py`, `tier1.py`, `tier2.py`, `classify.py` | ~70% rejected free at Tier 0; only high-score alerts pay for the trace tier |
 | Cache-keyed replay determinism | `materiality/tier1.py:cache_key`, `tier2.py:cache_key`, `replay.py` | Slider re-fetch is free, free, and the same — no live LLM during replay |
-| Closed-set evidence URLs | `materiality/tier2.py:build_allowed_urls` | Sonnet picks `source_url` from a list it's given; hallucinated links are rejected pre-cache |
+| Closed-set evidence URLs | `materiality/tier2.py:build_allowed_urls` | Tier 2 picks `source_url` from a list it's given; hallucinated links are rejected pre-cache |
 | Idempotent bulk ingest | `ingest.py:_INSERT_SQL` (`jsonb_to_recordset` + `ON CONFLICT DO NOTHING`) | Same upstream pull twice → zero duplicates, no per-row roundtrips |
 | Daily LLM cost cap | `materiality/classify.py:daily_cost_so_far` | Hard $5/day ceiling; over-budget candidates skip until tomorrow, never surprise-bill |
 | Per-source circuit breaker | `circuit_breaker.py` (Redis) | 3 failures in 5min → pause source for 15min; surfaces in `/health` |
@@ -191,7 +190,7 @@ flowchart TD
 - Python 3.11+ · FastAPI 0.115 · SQLAlchemy 2 (async) · asyncpg 0.30
 - Postgres 16 + PostGIS 3.4 · Alembic 1.14
 - Redis 7 (Streams + circuit breaker + rate limit)
-- Anthropic SDK 0.40 (Claude Haiku 4.5 + Sonnet 4.6, tool-use for structured output)
+- Anthropic SDK 0.40 (tool-use for structured output across both classifier tiers; specific model ids are env-config)
 - APScheduler 3.10 · tenacity 9.0 · structlog 24.4 · GeoAlchemy2 0.16
 
 **Frontend** (`web/`)
@@ -212,7 +211,7 @@ Deliberate choices where the simpler option beats the orthodox one:
 
 - **PostGIS over DuckDB-Spatial**. We need OLTP writes (event log, alerts) plus spatial joins on the hot path. PostGIS is the only mature option for both — DuckDB-Spatial is great analytical, weak for the write-heavy paths.
 - **In-process classification over Redis Streams worker pool**. The architecture doc reserves Redis Streams for scale; in code we run the classifier inline after `insert_events` returns the new event ids. At Multnomah-county volume (~3k events/day) this is fine. Streams is a one-file change when we need it.
-- **Cache key incorporates the tier**. `cache_key()` for Tier 1 vs `cache_key()` for Tier 2 produce different bytes for the same `(event, parcel, thesis_version)` so they coexist in `classifier_cache` (whose primary key is just `cache_key`). Tier 2 prefixes its hash with `b"sonnet:"`.
+- **Cache key incorporates the tier**. `cache_key()` for Tier 1 vs `cache_key()` for Tier 2 produce different bytes for the same `(event, parcel, thesis_version)` so they coexist in `classifier_cache` (whose primary key is just `cache_key`). Tier 2 prefixes its hash with a tier label.
 - **Replay reuses the current parcels projection, not bitemporal snapshots**. A 30-day-ago replay over today's parcel state is honest enough for a demo; bitemporal projections are a v2 stretch and called out in the README rather than silently faked.
 - **Fixture adapters for the 3 axes whose real public APIs don't exist** (Portland zoning amendments, deed records, listings/comps). Each carries `source = "fixture_*"` so the UI can render a small "fixture" badge — the demo never claims fixture data is real. The `SourceAdapter` shape is identical to real adapters, so swapping a fixture for a real source is a one-file diff.
 - **Anonymous workspace UUID for visitor-created watchlists**. Real multi-tenancy is out of scope; rate limit (5/IP/hour) is the only abuse gate. Clerk auth is a one-day add when needed.

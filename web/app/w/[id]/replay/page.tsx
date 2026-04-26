@@ -6,7 +6,7 @@ import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { FixtureBadge } from "@/components/fixture-badge";
 import { type ReplayAlert, type ReplayResponse, postReplay } from "@/lib/api";
-import { AXIS_STYLES, formatRelativeTime, isFixtureSource, scoreTone } from "@/lib/ui";
+import { AXIS_STYLES, formatRelativeTime, isFixtureSource, scoreTone, tierLabel } from "@/lib/ui";
 
 const WINDOW_MAX_DAYS = 90;
 const DEFAULT_RANGE: [number, number] = [0, 30];
@@ -235,7 +235,7 @@ function AlertRow({
             <span className="text-zinc-700">·</span>
             <span>{formatRelativeTime(alert.occurred_at)}</span>
             <span className="text-zinc-700">·</span>
-            <span className="uppercase">{alert.classifier_tier}</span>
+            <span className="uppercase">{tierLabel(alert.classifier_tier)}</span>
             {fixture && <FixtureBadge />}
           </p>
         </div>

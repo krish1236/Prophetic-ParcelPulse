@@ -19,6 +19,18 @@ export function isFixtureSource(source: string): boolean {
   return source.startsWith("fixture_");
 }
 
+/**
+ * Map the backend's `classifier_tier` value (which carries internal model
+ * identifiers) to a generic user-facing label. We don't surface specific
+ * model names in the UI — the demo's value lives at the engine layer, not
+ * in any one model choice.
+ */
+export function tierLabel(tier: string): string {
+  if (tier === "sonnet") return "tier 2";
+  if (tier === "haiku") return "tier 1";
+  return tier;
+}
+
 export function formatRelativeTime(iso: string): string {
   const then = new Date(iso).getTime();
   const now = Date.now();

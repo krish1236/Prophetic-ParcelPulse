@@ -2,9 +2,9 @@
  * Renders the structured Tier-2 decision trace card.
  *
  * Handles three shapes that may land in `alerts.decision_trace`:
- *   - Full Sonnet output  (what_changed / why_it_matters / evidence / next_step)
- *   - Fixture data        (same shape + `fixture: true`)
- *   - Tier-1 placeholder  (`placeholder: true`) — renders a quiet note instead.
+ *   - Full trace output    (what_changed / why_it_matters / evidence / next_step)
+ *   - Fixture data         (same shape + `fixture: true`)
+ *   - Tier-1-only placeholder (`placeholder: true`) — renders a quiet note instead.
  */
 
 import type { ReactNode } from "react";
@@ -33,8 +33,8 @@ export function DecisionTrace({ trace }: { trace: Trace }) {
     return (
       <Section title="Decision trace">
         <p className="text-sm text-zinc-500">
-          Tier 2 (Sonnet) didn&apos;t run for this alert — score below threshold or
-          budget exhausted. The Tier 1 summary above is the briefing.
+          Tier 2 didn&apos;t run for this alert — score below threshold or budget
+          exhausted. The Tier 1 summary above is the briefing.
         </p>
       </Section>
     );
