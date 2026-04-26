@@ -15,6 +15,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from parcelpulse.adapters.base import SourceAdapter
+from parcelpulse.circuit_breaker import is_paused, record_failure, record_success
 from parcelpulse.ingest import insert_events
 from parcelpulse.materiality.classify import classify_events
 from parcelpulse.registry import all_adapters
@@ -23,12 +24,22 @@ log = logging.getLogger(__name__)
 
 
 async def run_adapter_once(adapter: SourceAdapter) -> tuple[int, int, int]:
-    """Pull → ingest → classify for one adapter. Returns (fetched, inserted, alerted)."""
+    """Pull → ingest → classify for one adapter. Returns (fetched, inserted, alerted).
+
+    Skips the pull entirely if the source's circuit breaker is open. A
+    successful fetch clears any partial-failure count; a fetch exception
+    increments the count and may trip the breaker.
+    """
+    if await is_paused(adapter.name):
+        log.warning("adapter=%s skipped: circuit breaker open", adapter.name)
+        return 0, 0, 0
     try:
         events = await adapter.fetch()
     except Exception:
+        await record_failure(adapter.name)
         log.exception("adapter=%s fetch failed", adapter.name)
         return 0, 0, 0
+    await record_success(adapter.name)
     try:
         new_ids = await insert_events(events)
     except Exception:

@@ -13,6 +13,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from parcelpulse.adapters.base import SourceAdapter
+from parcelpulse.circuit_breaker import paused_for_all
 
 
 class SourceStatus(TypedDict):
@@ -38,6 +39,7 @@ async def source_status(
         )
     ).all()
     last_by_source: dict[str, datetime] = {r.source: r.last_ingested_at for r in rows}
+    pause_by_source = await paused_for_all(names)
 
     now = datetime.now(UTC)
     out: list[SourceStatus] = []
@@ -48,7 +50,7 @@ async def source_status(
                 "name": adapter.name,
                 "last_ingested_at": last.isoformat() if last else None,
                 "lag_seconds": int((now - last).total_seconds()) if last else None,
-                "paused": False,
+                "paused": pause_by_source.get(adapter.name, False),
             }
         )
     return out
