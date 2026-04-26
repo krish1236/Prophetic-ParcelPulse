@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from parcelpulse.db import get_session
 from parcelpulse.health import source_status
 from parcelpulse.registry import all_adapters
-from parcelpulse.routes import parcels
+from parcelpulse.routes import parcels, watchlists
 from parcelpulse.settings import settings
 
 app = FastAPI(title="ParcelPulse", version="0.1.0")
@@ -19,6 +19,7 @@ app.add_middleware(
 )
 
 app.include_router(parcels.router)
+app.include_router(watchlists.router)
 
 
 @app.get("/health")
