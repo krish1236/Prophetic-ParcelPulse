@@ -290,4 +290,4 @@ The infra is sized for a single-region single-host deployment:
 
 ---
 
-Repo: https://github.com/krish1236/parcelpulse  *(planned name; currently private until Phase 11)*
+Repo: https://github.com/krish1236/parcelpulse 
