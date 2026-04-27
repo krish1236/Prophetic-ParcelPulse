@@ -41,6 +41,13 @@ export default async function Home() {
             >
               see demo →
             </Link>
+            <span className="text-zinc-700">·</span>
+            <Link
+              href="/blog/replay"
+              className="font-mono text-xs text-zinc-400 transition hover:text-zinc-200"
+            >
+              engineering note →
+            </Link>
           </div>
         </div>
 
