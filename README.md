@@ -289,4 +289,4 @@ The infra is sized for a single-region single-host deployment:
 
 ---
 
-Repo: https://github.com/krish1236/parcelpulse 
+Repo: https://github.com/krish1236/Prophetic-ParcelPulse 
