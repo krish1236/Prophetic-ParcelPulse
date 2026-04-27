@@ -39,12 +39,16 @@ async def main() -> None:
     print("[bootstrap] running migrations...", flush=True)
     run(["alembic", "upgrade", "head"])
 
+    # Heavy: only on a truly empty DB.
     if await parcels_already_loaded():
-        print("[bootstrap] seed step skipped (parcels already present).", flush=True)
-        return
+        print("[bootstrap] parcels already loaded; skipping load_parcels.", flush=True)
+    else:
+        print("[bootstrap] empty DB — loading ~284k parcels (~10 min)...", flush=True)
+        run(["python", "scripts/load_parcels.py"])
 
-    print("[bootstrap] empty DB — running first-deploy seed (~10 min)...", flush=True)
-    run(["python", "scripts/load_parcels.py"])
+    # Cheap + idempotent (ON CONFLICT DO UPDATE) — run every start so the demo
+    # watchlist and fixture alerts always exist, even if a prior bootstrap
+    # half-completed or someone wiped the data.
     run(["python", "scripts/seed_watchlist.py"])
     run(["python", "scripts/seed_fixture_alerts.py"])
     print("[bootstrap] complete.", flush=True)
