@@ -27,7 +27,7 @@ export default async function Home() {
           <h2 className="font-mono text-xs uppercase tracking-[0.2em] text-zinc-500">
             Recent alerts
           </h2>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <Link
               href="/w/new"
               className="font-mono text-xs text-zinc-400 transition hover:text-zinc-200"
@@ -47,6 +47,13 @@ export default async function Home() {
               className="font-mono text-xs text-zinc-400 transition hover:text-zinc-200"
             >
               engineering note →
+            </Link>
+            <span className="text-zinc-700">·</span>
+            <Link
+              href="/admin/ops"
+              className="font-mono text-xs text-zinc-400 transition hover:text-zinc-200"
+            >
+              ops →
             </Link>
           </div>
         </div>
